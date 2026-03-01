@@ -19,7 +19,7 @@ export interface StyleImage {
 export interface RenderJob {
   id: string;
   projectId: string;
-  referenceImage: string; // Base64 data URI
+  referenceImage?: string; // Base64 data URI (optional for T2I)
   userInstruction?: string;
   outputImage: string; // Base64 data URI
   createdAt: number;

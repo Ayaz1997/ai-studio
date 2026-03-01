@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getProject, getStyleImages, getRenderJobs, saveRenderJob, deleteRenderJob, StyleProject, StyleImage, RenderJob } from '@/lib/storage';
 import ImageUpload from '@/components/ImageUpload';
-import { ArrowLeft, Wand2, Download, Image as ImageIcon, Sparkles, Loader2, Info, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, Wand2, Download, Image as ImageIcon, Sparkles, Loader2, Info, X, Trash2, LayoutGrid, Square, Grid3X3, Type } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RenderStudio() {
@@ -18,10 +18,12 @@ export default function RenderStudio() {
     const [styleImages, setStyleImages] = useState<StyleImage[]>([]);
     const [history, setHistory] = useState<RenderJob[]>([]);
 
+    const [generationMode, setGenerationMode] = useState<'I2I' | 'T2I'>('I2I');
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [instruction, setInstruction] = useState('');
     const [aspectRatio, setAspectRatio] = useState('1:1');
     const [model, setModel] = useState('gemini-3.1-flash-image-preview'); // default model
+    const [gridCols, setGridCols] = useState<1 | 2 | 3>(2);
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
@@ -46,8 +48,13 @@ export default function RenderStudio() {
     }, [projectId, router]);
 
     const handleGenerate = async () => {
-        if (referenceImages.length === 0) {
-            setErrorMsg("Please upload a reference image.");
+        if (generationMode === 'I2I' && referenceImages.length === 0) {
+            setErrorMsg("Please upload a reference image for Image-to-Image generation.");
+            return;
+        }
+
+        if (generationMode === 'T2I' && !instruction.trim()) {
+            setErrorMsg("Please provide a text prompt to generate an image.");
             return;
         }
 
@@ -61,16 +68,18 @@ export default function RenderStudio() {
         }
 
         try {
+            const payload = {
+                styleDescriptor: project.styleDescriptor,
+                instruction,
+                modelName: model,
+                aspectRatio,
+                ...(generationMode === 'I2I' ? { referenceImage: referenceImages[0] } : {})
+            };
+
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    styleDescriptor: project.styleDescriptor,
-                    referenceImage: referenceImages[0],
-                    instruction,
-                    modelName: model,
-                    aspectRatio
-                })
+                body: JSON.stringify(payload)
             });
 
             const result = await response.json();
@@ -78,13 +87,12 @@ export default function RenderStudio() {
             if (result.success && result.image) {
                 const newJob = await saveRenderJob({
                     projectId,
-                    referenceImage: referenceImages[0],
                     userInstruction: instruction,
-                    outputImage: result.image
+                    outputImage: result.image,
+                    ...(generationMode === 'I2I' ? { referenceImage: referenceImages[0] } : {})
                 });
                 setHistory([newJob, ...history]);
-                setReferenceImages([]); // Reset inputs
-                setInstruction('');
+                // Keep the prompt/image around for iterative generation, don't clear immediately.
             } else {
                 setErrorMsg(result.error || "Failed to generate image. The model might have returned text instead.");
                 // If it was a fallback text result, log or handle.
@@ -118,17 +126,21 @@ export default function RenderStudio() {
     if (!project) return null; // or loading state
 
     return (
-        <div className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30 flex flex-col md:flex-row">
+        <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-indigo-500/30 flex flex-col md:flex-row relative overflow-hidden">
+
+            {/* Background Glows */}
+            <div className="absolute top-[-5%] right-[20%] w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-[10%] left-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px] pointer-events-none"></div>
 
             {/* LEFT PANEL: Workspace */}
-            <div className="w-full md:w-[450px] lg:w-[500px] border-r border-neutral-800 bg-neutral-900/40 flex flex-col h-screen h-[100dvh]">
-                <div className="p-6 border-b border-neutral-800 flex items-center justify-between shrink-0">
+            <div className="w-full md:w-[450px] lg:w-[500px] border-r border-neutral-800/50 bg-black/60 backdrop-blur-xl flex flex-col h-screen h-[100dvh] relative z-20 shadow-2xl">
+                <div className="p-6 border-b border-neutral-800/50 flex items-center justify-between shrink-0 bg-gradient-to-b from-neutral-900/50 to-transparent">
                     <div className="flex items-center gap-4">
-                        <Link href="/" className="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-full transition-colors text-neutral-400 hover:text-white">
+                        <Link href="/" className="p-2 bg-neutral-800/50 hover:bg-neutral-700/80 rounded-full transition-colors text-neutral-400 hover:text-white backdrop-blur-md border border-neutral-700/50">
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
                         <div>
-                            <h2 className="font-semibold text-lg">{project.name}</h2>
+                            <h2 className="font-semibold text-lg bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">{project.name}</h2>
                             <div className="text-xs text-indigo-400 font-medium tracking-wide uppercase flex items-center gap-1">
                                 <Sparkles className="w-3 h-3" /> Render Studio
                             </div>
@@ -145,27 +157,68 @@ export default function RenderStudio() {
 
                 <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-8">
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-neutral-200 mb-2">1. Reference Image</label>
-                            <ImageUpload multiple={false} onImagesSelected={setReferenceImages} />
+                    <div className="space-y-6">
+
+                        {/* Generation Mode Tabs */}
+                        <div className="flex bg-neutral-900/80 p-1.5 rounded-xl border border-neutral-800 shadow-inner">
+                            <button
+                                onClick={() => setGenerationMode('I2I')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${generationMode === 'I2I' ? 'bg-indigo-600 text-white shadow-md' : 'text-neutral-500 hover:text-white hover:bg-neutral-800'}`}
+                            >
+                                <ImageIcon className="w-4 h-4" /> Image to Image
+                            </button>
+                            <button
+                                onClick={() => setGenerationMode('T2I')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${generationMode === 'T2I' ? 'bg-indigo-600 text-white shadow-md' : 'text-neutral-500 hover:text-white hover:bg-neutral-800'}`}
+                            >
+                                <Type className="w-4 h-4" /> Text to Image
+                            </button>
                         </div>
 
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="block text-sm font-medium text-neutral-200">2. Instruction Prompt (Optional)</label>
+                        {generationMode === 'I2I' ? (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-semibold text-neutral-200 mb-2">1. Reference Image</label>
+                                    <ImageUpload multiple={false} onImagesSelected={setReferenceImages} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-semibold text-neutral-200">2. Instruction Prompt (Optional)</label>
+                                    </div>
+                                    <textarea
+                                        value={instruction}
+                                        onChange={e => setInstruction(e.target.value)}
+                                        placeholder="Leave blank for strictly structurally perfect style mapping, or add specific details like 'neon outlines'..."
+                                        rows={3}
+                                        className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none shadow-inner text-sm placeholder:text-neutral-600"
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-semibold text-neutral-200 flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-indigo-400" /> What do you want to generate? <span className="text-red-400">*</span>
+                                    </label>
+                                </div>
+                                <div className="relative group">
+                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                                    <textarea
+                                        value={instruction}
+                                        onChange={e => setInstruction(e.target.value)}
+                                        placeholder="e.g. A futuristic cyberpunk city street with flying cars at night..."
+                                        rows={5}
+                                        className="relative w-full bg-black border border-indigo-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm placeholder:text-neutral-600 leading-relaxed"
+                                    />
+                                </div>
+                                <p className="text-xs text-neutral-500 mt-2 ml-1">The AI will build this scene from scratch using your trained style.</p>
                             </div>
-                            <textarea
-                                value={instruction}
-                                onChange={e => setInstruction(e.target.value)}
-                                placeholder="Leave blank for strictly structurally perfect style mapping, or add specific details like 'neon outlines'..."
-                                rows={3}
-                                className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none shadow-inner text-sm placeholder:text-neutral-600"
-                            />
-                        </div>
+                        )}
 
                         <div>
-                            <label className="block text-sm font-medium text-neutral-200 mb-2">3. Aspect Ratio</label>
+                            <label className="block text-sm font-semibold text-neutral-200 mb-2 flex items-center gap-2">
+                                {generationMode === 'I2I' ? '3.' : '2.'} Aspect Ratio
+                            </label>
                             <div className="flex gap-2 bg-black p-1 rounded-xl border border-neutral-800">
                                 {['1:1', '4:3', '16:9', '9:16'].map(ratio => (
                                     <button
@@ -180,7 +233,9 @@ export default function RenderStudio() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-neutral-200 mb-2">4. Selection Model</label>
+                            <label className="block text-sm font-semibold text-neutral-200 mb-2 flex items-center gap-2">
+                                {generationMode === 'I2I' ? '4.' : '3.'} Selection Model
+                            </label>
                             <div className="flex flex-col gap-3">
                                 <label className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all ${model === 'gemini-3.1-flash-image-preview' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 bg-black hover:border-neutral-600'}`}>
                                     <input
@@ -222,14 +277,14 @@ export default function RenderStudio() {
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-neutral-800 shrink-0 bg-neutral-900/80 backdrop-blur-md">
+                <div className="p-6 border-t border-neutral-800/50 shrink-0 bg-black/40 backdrop-blur-xl">
                     <button
                         onClick={handleGenerate}
-                        disabled={isGenerating || referenceImages.length === 0}
-                        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)]"
+                        disabled={isGenerating || (generationMode === 'I2I' ? referenceImages.length === 0 : !instruction.trim())}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:from-neutral-800 disabled:to-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(79,70,229,0.2)] hover:shadow-[0_0_30px_rgba(79,70,229,0.4)] disabled:shadow-none translate-y-0 hover:-translate-y-0.5 active:translate-y-0 duration-200"
                     >
                         {isGenerating ? (
-                            <><Loader2 className="w-5 h-5 animate-spin" /> Gathering context & Rendering...</>
+                            <><Loader2 className="w-5 h-5 animate-spin" /> Gathering context & Generating...</>
                         ) : (
                             <><Wand2 className="w-5 h-5" /> Generate Styled Output</>
                         )}
@@ -238,32 +293,77 @@ export default function RenderStudio() {
             </div>
 
             {/* RIGHT PANEL: Output Map */}
-            <div className="flex-1 bg-black p-8 overflow-y-auto relative h-screen h-[100dvh]">
-                <div className="max-w-4xl mx-auto">
-                    <h3 className="text-2xl font-bold tracking-tight mb-8">Render History</h3>
+            <div className="flex-1 bg-transparent p-6 md:p-8 overflow-y-auto relative z-10 h-screen h-[100dvh] custom-scrollbar">
+                <div className="max-w-6xl mx-auto">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                        <h3 className="text-2xl font-bold tracking-tight">Render History</h3>
 
-                    {history.length === 0 ? (
+                        {/* Grid View Toggles */}
+                        <div className="flex items-center gap-1 bg-neutral-900/80 p-1 border border-neutral-800/50 rounded-xl backdrop-blur-md shadow-inner">
+                            <button onClick={() => setGridCols(1)} className={`p-2 rounded-lg transition-all ${gridCols === 1 ? 'bg-indigo-500/20 text-indigo-400' : 'text-neutral-500 hover:text-white hover:bg-neutral-800'}`} title="1x1 Large View">
+                                <Square className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setGridCols(2)} className={`p-2 rounded-lg transition-all ${gridCols === 2 ? 'bg-indigo-500/20 text-indigo-400' : 'text-neutral-500 hover:text-white hover:bg-neutral-800'}`} title="2x2 Medium Grid">
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setGridCols(3)} className={`p-2 rounded-lg transition-all ${gridCols === 3 ? 'bg-indigo-500/20 text-indigo-400' : 'text-neutral-500 hover:text-white hover:bg-neutral-800'}`} title="3x3 Compact Grid">
+                                <Grid3X3 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {history.length === 0 && !isGenerating ? (
                         <div className="flex flex-col items-center justify-center p-20 text-center text-neutral-500 border border-neutral-800 border-dashed rounded-3xl h-[60vh]">
                             <ImageIcon className="w-16 h-16 mb-4 opacity-30" />
                             <p className="text-lg">No renders yet for this project.</p>
                             <p className="text-sm mt-2 max-w-sm mx-auto">Use the workspace on the left to upload a reference image and apply your learned style.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                            {history.map(job => (
-                                <div key={job.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden hover:border-indigo-500/30 transition-all group">
-                                    <div className="p-4 flex gap-4 border-b border-neutral-800 bg-black/40">
-                                        <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-neutral-700">
-                                            <img src={job.referenceImage} className="w-full h-full object-cover" alt="Reference" />
+                        <div className={`grid gap-6 ${gridCols === 1 ? 'grid-cols-1' :
+                                gridCols === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                                    'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                            }`}>
+
+                            {/* Loading Skeleton */}
+                            {isGenerating && (
+                                <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md animate-pulse">
+                                    <div className="p-4 flex gap-4 border-b border-white/5 bg-black/40">
+                                        <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-neutral-800 bg-neutral-800/50"></div>
+                                        <div className="flex-1 flex flex-col justify-center space-y-3">
+                                            <div className="h-3 bg-neutral-800/80 rounded w-1/3"></div>
+                                            <div className="h-4 bg-indigo-500/20 rounded w-3/4"></div>
                                         </div>
-                                        <div className="flex-1 overflow-hidden">
-                                            <div className="text-xs text-neutral-500 font-medium mb-1">PROMPT INSTRUCTION</div>
-                                            <p className="text-sm text-neutral-300 line-clamp-2 italic">
+                                    </div>
+                                    <div className={`relative bg-neutral-900/50 flex items-center justify-center overflow-hidden
+                                        ${aspectRatio === '16:9' ? 'aspect-video' : aspectRatio === '9:16' ? 'aspect-[9/16]' : aspectRatio === '4:3' ? 'aspect-[4/3]' : 'aspect-square'}
+                                    `}>
+                                        <Loader2 className="w-10 h-10 animate-spin text-indigo-500/50" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {history.map(job => (
+                                <div key={job.id} className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden hover:border-indigo-500/50 transition-all duration-300 group shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] backdrop-blur-md flex flex-col">
+                                    <div className="p-4 flex gap-4 border-b border-white/5 bg-black/40 shrink-0">
+                                        {job.referenceImage ? (
+                                            <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-neutral-700 shadow-inner">
+                                                <img src={job.referenceImage} className="w-full h-full object-cover" alt="Reference" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-16 h-16 shrink-0 rounded-lg border border-neutral-700 bg-indigo-500/10 text-indigo-400 flex items-center justify-center shadow-inner">
+                                                <Type className="w-6 h-6" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 overflow-hidden flex flex-col justify-center">
+                                            <div className="text-[10px] text-neutral-500 font-bold tracking-wider mb-1 uppercase">
+                                                {job.referenceImage ? 'I2I Instruction' : 'T2I Prompt'}
+                                            </div>
+                                            <p className="text-sm text-neutral-300 line-clamp-2 italic leading-relaxed">
                                                 "{job.userInstruction || 'Strict structural adherence mapping'}"
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="relative aspect-square sm:aspect-video xl:aspect-square bg-neutral-950 flex items-center justify-center overflow-hidden">
+                                    <div className="relative flex-1 bg-black/60 flex items-center justify-center overflow-hidden min-h-[250px]">
                                         <img src={job.outputImage} className="w-full h-full object-contain" alt="Styled Result" />
 
                                         {/* Hover Actions */}

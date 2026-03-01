@@ -14,8 +14,11 @@ export default function StyleProjectCard({ project, imageCount, onDelete }: Styl
 
     return (
         <Link href={`/project/${project.id}`}>
-            <div className="group bg-neutral-900 border border-neutral-800 hover:border-indigo-500/50 rounded-2xl p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-indigo-500/10 cursor-pointer h-full flex flex-col justify-between">
-                <div>
+            <div className="relative group bg-white/5 backdrop-blur-xl border border-white/10 hover:border-indigo-500/50 hover:bg-white/[0.07] rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(99,102,241,0.15)] cursor-pointer h-full flex flex-col justify-between overflow-hidden">
+                {/* Glow Effect */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-[50px] -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/30 transition-colors"></div>
+
+                <div className="relative z-10">
                     <div className="flex items-start justify-between mb-4">
                         <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
                             <Palette className="w-6 h-6" />
@@ -44,9 +47,9 @@ export default function StyleProjectCard({ project, imageCount, onDelete }: Styl
                     )}
                 </div>
 
-                <div className="flex items-center justify-between mt-6 pt-4 border-t border-neutral-800/50">
-                    <div className="text-sm text-neutral-400">
-                        <strong className="text-indigo-400">{imageCount}</strong> style references
+                <div className="flex items-center justify-between mt-6 pt-5 border-t border-white/10 relative z-10">
+                    <div className="text-sm text-neutral-400 font-medium">
+                        <strong className="text-indigo-400 font-semibold">{imageCount}</strong> references
                     </div>
                     <ArrowRight className="w-5 h-5 text-neutral-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
                 </div>

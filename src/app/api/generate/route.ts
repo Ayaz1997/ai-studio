@@ -30,12 +30,17 @@ export async function POST(req: NextRequest) {
 
         console.log("Generating with descriptor: " + styleDescriptor);
 
-        if (!styleDescriptor || !referenceImage || !modelName) {
+        if (!styleDescriptor || !modelName) {
             return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
         }
 
         const ai = getAi();
-        const prompt = `You are a strict and precise style transfer system. 
+        let prompt = '';
+        let contents = [];
+
+        if (referenceImage) {
+            // Image-to-Image Mode
+            prompt = `You are a strict and precise style transfer system. 
 You will be provided with a reference image. 
 Your singular goal is to REDRAW the exact structural subject matter of the reference image perfectly, but execute it entirely in the following artistic style:
 
@@ -50,11 +55,32 @@ CRITICAL RULES:
 5. Apply the precise colors requested in the style definition. Keep the requested Aspect Ratio: ${aspectRatio || '1:1'}.
 6. Custom Instruction: "${instruction || 'Strictly maintain structural adherence without adding elements.'}"
 `;
+            contents = [
+                parseBase64ToPart(referenceImage),
+                { text: prompt }
+            ];
+        } else {
+            // Text-to-Image Mode
+            if (!instruction) {
+                return NextResponse.json({ success: false, error: 'A text prompt is required for Text-to-Image generation.' }, { status: 400 });
+            }
+            prompt = `You are a strict and precise AI image generator.
+Your singular goal is to generate a completely new image from scratch based on the user's prompt, but execute it entirely in the following artistic style:
 
-        const contents = [
-            parseBase64ToPart(referenceImage),
-            { text: prompt }
-        ];
+STYLE DEFINITION:
+${styleDescriptor}
+
+CRITICAL RULES:
+1. Generate the subject matter described entirely from scratch based on the "User Prompt".
+2. The generated image MUST strictly adhere to the artistic style defined above.
+3. Apply the precise colors requested in the style definition. Keep the requested Aspect Ratio: ${aspectRatio || '1:1'}.
+4. DO NOT apply glossy, glass, or 3D effects unless explicitly stated in the style definition.
+5. User Prompt: "${instruction}"
+`;
+            contents = [
+                { text: prompt }
+            ];
+        }
 
         // Call Gemini generateContent (using the requested image prefix model)
         const response = await ai.models.generateContent({
