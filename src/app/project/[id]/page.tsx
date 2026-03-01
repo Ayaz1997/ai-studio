@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getProject, getStyleImages, getRenderJobs, saveRenderJob, deleteRenderJob, StyleProject, StyleImage, RenderJob } from '@/lib/storage';
 import ImageUpload from '@/components/ImageUpload';
-import { ArrowLeft, Wand2, Download, Image as ImageIcon, Sparkles, Loader2, Info, X, Trash2, LayoutGrid, Square, Grid3X3, Type } from 'lucide-react';
+import { ArrowLeft, Wand2, Download, Image as ImageIcon, Sparkles, Loader2, Info, X, Trash2, LayoutGrid, Square, Grid3X3, Type, Pencil } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RenderStudio() {
@@ -123,6 +123,25 @@ export default function RenderStudio() {
         }
     };
 
+    const handleEditJob = (e: React.MouseEvent, job: RenderJob) => {
+        e.stopPropagation();
+
+        // Load the instruction
+        setInstruction(job.userInstruction || '');
+
+        // Determine mode and load image if present
+        if (job.referenceImage) {
+            setGenerationMode('I2I');
+            setReferenceImages([job.referenceImage]);
+        } else {
+            setGenerationMode('T2I');
+            setReferenceImages([]);
+        }
+
+        // Smooth scroll to top/workspace for mobile users
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     if (!project) return null; // or loading state
 
     return (
@@ -179,7 +198,7 @@ export default function RenderStudio() {
                             <>
                                 <div>
                                     <label className="block text-sm font-semibold text-neutral-200 mb-2">1. Reference Image</label>
-                                    <ImageUpload multiple={false} onImagesSelected={setReferenceImages} />
+                                    <ImageUpload multiple={false} onImagesSelected={setReferenceImages} value={referenceImages} />
                                 </div>
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
@@ -320,8 +339,8 @@ export default function RenderStudio() {
                         </div>
                     ) : (
                         <div className={`grid gap-6 ${gridCols === 1 ? 'grid-cols-1' :
-                                gridCols === 2 ? 'grid-cols-1 md:grid-cols-2' :
-                                    'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                            gridCols === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                                'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
                             }`}>
 
                             {/* Loading Skeleton */}
@@ -367,20 +386,27 @@ export default function RenderStudio() {
                                         <img src={job.outputImage} className="w-full h-full object-contain" alt="Styled Result" />
 
                                         {/* Hover Actions */}
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                            <button
+                                                onClick={(e) => handleEditJob(e, job)}
+                                                className="bg-white/10 hover:bg-white text-white hover:text-indigo-600 p-4 rounded-full flex items-center justify-center transform translate-y-4 group-hover:translate-y-0 transition-all delay-[50ms] shadow-xl backdrop-blur-md"
+                                                title="Remix & Edit"
+                                            >
+                                                <Pencil className="w-6 h-6" />
+                                            </button>
                                             <button
                                                 onClick={(e) => handleDownload(e, job.outputImage)}
-                                                className="bg-white text-black hover:bg-neutral-200 px-6 py-3 rounded-full font-medium flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all delay-75 shadow-lg"
+                                                className="bg-white/10 hover:bg-white text-white hover:text-black p-4 rounded-full flex items-center justify-center transform translate-y-4 group-hover:translate-y-0 transition-all delay-[100ms] shadow-xl backdrop-blur-md"
                                                 title="Download PNG"
                                             >
-                                                <Download className="w-4 h-4" /> Download Result
+                                                <Download className="w-6 h-6" />
                                             </button>
                                             <button
                                                 onClick={(e) => handleDeleteJob(e, job.id)}
-                                                className="bg-red-500/80 hover:bg-red-500 text-white p-3 rounded-full flex items-center justify-center transform translate-y-4 group-hover:translate-y-0 transition-all delay-100 shadow-lg"
+                                                className="bg-red-500/80 hover:bg-red-500 text-white p-4 rounded-full flex items-center justify-center transform translate-y-4 group-hover:translate-y-0 transition-all delay-[150ms] shadow-xl backdrop-blur-md"
                                                 title="Delete Render"
                                             >
-                                                <Trash2 className="w-5 h-5" />
+                                                <Trash2 className="w-6 h-6" />
                                             </button>
                                         </div>
                                     </div>

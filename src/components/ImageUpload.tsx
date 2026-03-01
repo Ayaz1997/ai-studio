@@ -6,12 +6,13 @@ import { UploadCloud, X } from 'lucide-react';
 
 interface ImageUploadProps {
     onImagesSelected: (base64Images: string[]) => void;
+    value?: string[];
     multiple?: boolean;
     maxFiles?: number;
 }
 
-export default function ImageUpload({ onImagesSelected, multiple = false, maxFiles = 10 }: ImageUploadProps) {
-    const [previews, setPreviews] = useState<string[]>([]);
+export default function ImageUpload({ onImagesSelected, value, multiple = false, maxFiles = 10 }: ImageUploadProps) {
+    const [previews, setPreviews] = useState<string[]>(value || []);
     const [isHovering, setIsHovering] = useState(false);
 
     const handleFiles = useCallback((files: FileList | File[]) => {
@@ -62,6 +63,13 @@ export default function ImageUpload({ onImagesSelected, multiple = false, maxFil
         window.addEventListener('paste', handlePaste);
         return () => window.removeEventListener('paste', handlePaste);
     }, [handleFiles]);
+
+    // Sync external value changes (e.g., from Remix flow)
+    useEffect(() => {
+        if (value) {
+            setPreviews(value);
+        }
+    }, [value]);
 
     const removeImage = (index: number) => {
         const updated = previews.filter((_, i) => i !== index);
