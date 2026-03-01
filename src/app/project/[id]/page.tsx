@@ -20,6 +20,7 @@ export default function RenderStudio() {
 
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [instruction, setInstruction] = useState('');
+    const [aspectRatio, setAspectRatio] = useState('1:1');
     const [model, setModel] = useState('gemini-3.1-flash-image-preview'); // default model
 
     const [isGenerating, setIsGenerating] = useState(false);
@@ -67,7 +68,8 @@ export default function RenderStudio() {
                     styleDescriptor: project.styleDescriptor,
                     referenceImage: referenceImages[0],
                     instruction,
-                    modelName: model
+                    modelName: model,
+                    aspectRatio
                 })
             });
 
@@ -150,18 +152,35 @@ export default function RenderStudio() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-neutral-200 mb-2">2. Instruction Prompt (Optional)</label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-neutral-200">2. Instruction Prompt (Optional)</label>
+                            </div>
                             <textarea
                                 value={instruction}
                                 onChange={e => setInstruction(e.target.value)}
-                                placeholder="e.g. Turn the subjects into neon outlines..."
+                                placeholder="Leave blank for strictly structurally perfect style mapping, or add specific details like 'neon outlines'..."
                                 rows={3}
-                                className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none shadow-inner"
+                                className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none shadow-inner text-sm placeholder:text-neutral-600"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-neutral-200 mb-2">3. Selection Model</label>
+                            <label className="block text-sm font-medium text-neutral-200 mb-2">3. Aspect Ratio</label>
+                            <div className="flex gap-2 bg-black p-1 rounded-xl border border-neutral-800">
+                                {['1:1', '4:3', '16:9', '9:16'].map(ratio => (
+                                    <button
+                                        key={ratio}
+                                        onClick={() => setAspectRatio(ratio)}
+                                        className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${aspectRatio === ratio ? 'bg-indigo-600 text-white shadow-md' : 'text-neutral-500 hover:text-white hover:bg-neutral-800'}`}
+                                    >
+                                        {ratio}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-neutral-200 mb-2">4. Selection Model</label>
                             <div className="flex flex-col gap-3">
                                 <label className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all ${model === 'gemini-3.1-flash-image-preview' ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 bg-black hover:border-neutral-600'}`}>
                                     <input
@@ -240,7 +259,7 @@ export default function RenderStudio() {
                                         <div className="flex-1 overflow-hidden">
                                             <div className="text-xs text-neutral-500 font-medium mb-1">PROMPT INSTRUCTION</div>
                                             <p className="text-sm text-neutral-300 line-clamp-2 italic">
-                                                "{job.userInstruction || 'Apply style closely'}"
+                                                "{job.userInstruction || 'Strict structural adherence mapping'}"
                                             </p>
                                         </div>
                                     </div>

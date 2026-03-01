@@ -35,11 +35,13 @@ export async function POST(req: NextRequest) {
 
         const systemPrompt = `You are an expert art director and style analyst. Your task is to analyze the following images and extract a highly detailed, comprehensive textual description of their SHARED visual style. 
 
-        CRITICAL RULE: You MUST COMPLETELY IGNORE the subjects, objects, or people in the images (e.g., if the images are of cars, do not mention cars). You must only describe the aesthetic, artistic technique, color grading, lighting, brushwork, texture, mood, and visual properties. 
+        CRITICAL RULES:
+        1. COMPLETELY IGNORE the subjects, objects, or people in the images (e.g., if the images are of cars, do not mention cars).
+        2. EXTRACT the EXACT color palette (use specific color names), precise lighting, textural details, and artistic techniques.
+        3. DO NOT hallucinate "glass", "glossy", "3D", or "plastic" aesthetics unless they are undeniably the central style of every provided image.
+        4. If there are custom user instructions, incorporate them heavily into the stylistic definition: "${trainingInstruction || 'None provided.'}"
 
-        If there are custom user instructions, incorporate them heavily into the stylistic definition: "${trainingInstruction || 'None provided.'}"
-
-        Return ONLY the raw descriptive text detailing the style, optimized for a diffusion/generation prompt suffix. Make it punchy, descriptive, and highly specific to the visual execution.`;
+Return ONLY the raw descriptive text detailing the style, optimized for a diffusion/generation prompt suffix. Make it punchy, descriptive, and highly specific to the visual execution.`;
 
         const contents = [
             ...styleImages.map(parseBase64ToPart),
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
 
         const response = await ai.models.generateContent({
             // We use standard conversational context model to describe the style
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.1-pro-preview',
             contents: contents,
         });
 

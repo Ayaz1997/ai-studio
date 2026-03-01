@@ -26,7 +26,7 @@ function parseBase64ToPart(dataUri: string) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { styleDescriptor, referenceImage, instruction, modelName } = body;
+        const { styleDescriptor, referenceImage, instruction, modelName, aspectRatio } = body;
 
         console.log("Generating with descriptor: " + styleDescriptor);
 
@@ -37,16 +37,18 @@ export async function POST(req: NextRequest) {
         const ai = getAi();
         const prompt = `You are a strict and precise style transfer system. 
 You will be provided with a reference image. 
-Your singular goal is to REDRAW the exact subject matter of the reference image perfectly, but execute it entirely in the following artistic style:
+Your singular goal is to REDRAW the exact structural subject matter of the reference image perfectly, but execute it entirely in the following artistic style:
 
 STYLE DEFINITION:
 ${styleDescriptor}
 
 CRITICAL RULES:
-1. DO NOT change the subject of the reference image.
+1. DO NOT change the core subject or structural composition of the reference image. Let the reference image strictly guide your output.
 2. DO NOT add new objects, people, or items that are not in the reference image.
-3. DO NOT hallucinate.
-4. If a custom instruction is provided, follow it carefully: "${instruction || 'None.'}"
+3. DO NOT apply glossy, glass, or 3D effects unless explicitly stated in the style definition.
+4. If the instruction below is "Strictly maintain structural adherence without adding elements.", you must treat the reference image as sacred geometry and only change the textures/colors to match the style.
+5. Apply the precise colors requested in the style definition. Keep the requested Aspect Ratio: ${aspectRatio || '1:1'}.
+6. Custom Instruction: "${instruction || 'Strictly maintain structural adherence without adding elements.'}"
 `;
 
         const contents = [

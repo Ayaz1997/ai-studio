@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { UploadCloud, X } from 'lucide-react';
 
 interface ImageUploadProps {
@@ -14,7 +14,7 @@ export default function ImageUpload({ onImagesSelected, multiple = false, maxFil
     const [previews, setPreviews] = useState<string[]>([]);
     const [isHovering, setIsHovering] = useState(false);
 
-    const handleFiles = (files: FileList | File[]) => {
+    const handleFiles = useCallback((files: FileList | File[]) => {
         const validFiles = Array.from(files).filter(file => file.type.startsWith('image/')).slice(0, maxFiles);
         if (validFiles.length === 0) return;
 
@@ -40,7 +40,28 @@ export default function ImageUpload({ onImagesSelected, multiple = false, maxFil
             setPreviews(newPreviews);
             onImagesSelected(newPreviews);
         });
-    };
+    }, [maxFiles, multiple, onImagesSelected, previews]);
+
+    useEffect(() => {
+        const handlePaste = (e: ClipboardEvent) => {
+            // Prevent pasting if the user is currently typing in an input or textarea
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            if (e.clipboardData && e.clipboardData.files.length > 0) {
+                const files = Array.from(e.clipboardData.files).filter(file => file.type.startsWith('image/'));
+                if (files.length > 0) {
+                    e.preventDefault();
+                    handleFiles(files);
+                }
+            }
+        };
+
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [handleFiles]);
 
     const removeImage = (index: number) => {
         const updated = previews.filter((_, i) => i !== index);
@@ -50,27 +71,42 @@ export default function ImageUpload({ onImagesSelected, multiple = false, maxFil
 
     return (
         <div className="w-full">
-            <div
-                className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-colors cursor-pointer ${isHovering ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500 bg-neutral-800/50'}`}
-                onDragOver={(e) => { e.preventDefault(); setIsHovering(true); }}
-                onDragLeave={() => setIsHovering(false)}
-                onDrop={(e) => { e.preventDefault(); setIsHovering(false); handleFiles(e.dataTransfer.files); }}
-                onClick={() => document.getElementById('file-upload')?.click()}
-            >
-                <UploadCloud className="w-10 h-10 text-neutral-400 mb-4" />
-                <p className="text-neutral-300 font-medium text-center">Drag & drop images here</p>
-                <p className="text-neutral-500 text-sm text-center mt-1">or click to select files</p>
-                <input
-                    id="file-upload"
-                    type="file"
-                    multiple={multiple}
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => e.target.files && handleFiles(e.target.files)}
-                />
-            </div>
+            {(!multiple && previews.length > 0) ? (
+                <div className="relative w-full aspect-square md:aspect-video rounded-xl overflow-hidden bg-neutral-800 border-2 border-indigo-500/50 group">
+                    <img src={previews[0]} alt="Selected" className="w-full h-full object-contain bg-neutral-900" />
+                    <button
+                        onClick={(e) => { e.stopPropagation(); removeImage(0); }}
+                        className="absolute top-4 right-4 bg-black/60 hover:bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Reference Image
+                    </div>
+                </div>
+            ) : (
+                <div
+                    className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-colors cursor-pointer ${isHovering ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500 bg-neutral-800/50'}`}
+                    onDragOver={(e) => { e.preventDefault(); setIsHovering(true); }}
+                    onDragLeave={() => setIsHovering(false)}
+                    onDrop={(e) => { e.preventDefault(); setIsHovering(false); handleFiles(e.dataTransfer.files); }}
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                    <UploadCloud className="w-10 h-10 text-neutral-400 mb-4" />
+                    <p className="text-neutral-300 font-medium text-center">Drag & drop image{multiple ? 's' : ''} here</p>
+                    <p className="text-neutral-500 text-sm text-center mt-1">or click to select file{multiple ? 's' : ''}</p>
+                    <input
+                        id="file-upload"
+                        type="file"
+                        multiple={multiple}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => e.target.files && handleFiles(e.target.files)}
+                    />
+                </div>
+            )}
 
-            {previews.length > 0 && (
+            {(multiple && previews.length > 0) && (
                 <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {previews.map((preview, i) => (
                         <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-neutral-800 hover:ring-2 ring-indigo-500 transition-all">
